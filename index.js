@@ -1,65 +1,39 @@
-const fs = require("fs");
-const path = require("path");
-const readline = require("readline");
+// NODE SERVER WHICH WILL HANDLE SOCKET IO CONNECTIONS
 
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout
+// Initializing socket.io which is an instance of http on 8001 port
+// socket.io server will listen incomming events
+const io = require('socket.io')(8003, {
+    cors: {
+        origin: 'http://127.0.0.1:5501',
+        methods: ['GET', 'POST'],
+    }
 });
 
-// Function to rename files
-function renameFiles(folder, replaceThis, replaceWith, shouldRename) {
-  fs.readdir(folder, (err, data) => {
-    if (err) {
-      console.error("Error reading directory:", err);
-      return;
-    }
+const users={}
 
-    // To read the directory
-    for (let index = 0; index < data.length; index++) {
-      // for loop to iterate over each file in the directory
-      const item = data[index]; // A single file
+// io.on is an instance of socket.io which will listen many socket.io instance (many chat users connecting with this application so io.on will handle those connections)
+// socket.on means a particular instance of connection. It will define what will happen when a particular user joins in 
+io.on('connection',socket=>
+{
+// If a new user joins, let other users connected to the server know!
+    socket.on('new-user-joined',uname=>
+    {
+        // console.log("User is ",uname); // for testing is user is properly joined 
 
-      let oldFile = path.join(folder, item); // Existing filename
-      let newFile = path.join(folder, item.replace(replaceThis, replaceWith)); // Changing the name of the existing file
+        users[socket.id]=uname; // This will append names of the users to the users array
+        // socket.id - It is an id which is assigned for each connection
+        socket.broadcast.emit('user-joined', uname) // This event will be fired for all the other users (except the user who has joined the chat)
+    })
 
-      // Check if the file exists before renaming
-      if (fs.existsSync(oldFile)) {
-        // If shouldRename is true - rename the file; if false, just preview
-        if (shouldRename) {
-          fs.rename(oldFile, newFile, (err) => {
-            if (err) {
-              console.error(`Error renaming ${item}:`, err);
-            } else {
-              console.log(`Rename Successful: ${item} -> ${path.basename(newFile)}`);
-            }
-          });
-        } else {
-          if (oldFile !== newFile) {
-            console.log(`Preview: ${oldFile} will be renamed to ${newFile}`);
-          }
-        }
-      } else {
-        console.error(`File not found: ${oldFile}`);
-      }
-    }
-  }); // When the data is read, the asynchronous function will start running
-}
+// If someone sends a message broadcast it to other users. 
+// It will define what to do when a user sends a chat message
+    socket.on('send',message=>{
+        socket.broadcast.emit('receive',{message:message,uname:users[socket.id]}) // This event will be fired for the other chat users so that they can receive the message
+    })
 
-// Prompt user for input
-rl.question("Enter the text to replace: ", (replaceThis) => {
-  rl.question("Enter the replacement text: ", (replaceWith) => {
-    rl.question("Do you want to rename all the files? (yes or no): ", (answer) => {
-      const shouldRename = answer.trim().toLowerCase() === 'yes';
-
-      // Get current directory
-      const folder = process.cwd();
-
-      // Call function to rename files
-      renameFiles(folder, replaceThis, replaceWith, shouldRename);
-
-      // Close readline interface
-      rl.close();
-    });
-  });
-});
+// When a user disconnect from the chat application
+    socket.on('disconnect',message=>{
+        socket.broadcast.emit('left-chat',users[socket.id]) // This event will be fired for the other chat users so that they can receive the message
+        delete users[socket.id]; //To delete the disconnected user from our users array
+    })
+})
