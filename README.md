@@ -4,7 +4,7 @@ Features
 - Bulk rename files in a specified directory.
 - Preview changes before applying them.
 - User-friendly prompts for inputs.
-- 
+
 Prerequisites
 - [Node.js](https://nodejs.org/) installed on your machine.
 Install dependencies using npm install
